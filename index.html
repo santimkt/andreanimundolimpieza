@@ -391,7 +391,7 @@
 
             try {
                 // Descargar la plantilla de Andreani desde el repositorio
-                const plantillaResponse = await fetch('EnvioMasivoExcelPaquetes (5).xlsx');
+                const plantillaResponse = await fetch('plantilla.xlsx');
                 
                 if (!plantillaResponse.ok) {
                     throw new Error('No se pudo descargar la plantilla: ' + plantillaResponse.status);
