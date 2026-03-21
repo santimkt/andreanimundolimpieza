@@ -106,7 +106,6 @@
         .selection-bar.visible { display: flex; }
         
         .hidden { display: none !important; }
-        .loading { text-align: center; padding: 40px; color: #888; }
         .spinner {
             width: 40px; height: 40px;
             border: 3px solid #333;
@@ -237,7 +236,9 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- ExcelJS para manipular el Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    
     <script>
         let ordenes = [];
         let filtradas = [];
@@ -380,7 +381,7 @@
             return String(texto).replace(/-/g, ' ').replace(/"/g, '').replace(/;/g, ',').trim();
         }
 
-        function generarExcel() {
+        async function generarExcel() {
             const sels = ordenes.filter(o => seleccionadas.has(o.id));
             if (!sels.length) return toast('❌ Seleccioná al menos una orden', 'error');
 
@@ -388,87 +389,94 @@
             btn.disabled = true;
             btn.innerHTML = '⏳ Generando...';
 
-            // Crear datos para Excel con formato Andreani
-            const datos = [];
-            
-            // Fila 1 vacía (donde iría el logo)
-            datos.push([]);
-            
-            // Fila 2: Headers
-            datos.push([
-                'Paquete Guardado', 'Peso (grs)', 'Alto (cm)', 'Ancho (cm)', 'Profundidad (cm)',
-                'Valor declarado ($ C/IVA) *', 'Numero Interno', 'Nombre *', 'Apellido *', 'DNI *',
-                'Email *', 'Celular código *', 'Celular número *', 'Calle *', 'Número *',
-                'Piso', 'Departamento', 'Provincia / Localidad / CP *', 'Observaciones'
-            ]);
+            try {
+                // Descargar la plantilla de Andreani desde el repositorio
+                const plantillaResponse = await fetch('EnvioMasivoExcelPaquetes__5_.xlsx');
+                const plantillaBuffer = await plantillaResponse.arrayBuffer();
 
-            // Filas de datos
-            sels.forEach(o => {
-                const s = o.shipping_address || {};
-                const c = o.customer || {};
-                
-                const partes = (c.name || '').trim().split(/\s+/);
-                const apellido = partes.length > 1 ? partes.pop() : '';
-                const nombre = partes.join(' ');
-                
-                let tel = String(s.phone || c.phone || '').replace(/\D/g, '');
-                if (tel.startsWith('54')) tel = tel.substring(2);
-                if (tel.startsWith('9')) tel = tel.substring(1);
-                const codigo = tel.startsWith('11') ? '11' : tel.substring(0, 3);
-                const numero = tel.startsWith('11') ? tel.substring(2) : tel.substring(3);
-                
-                const dni = String(c.identification || '').replace(/\D/g, '').substring(0, 8);
-                
-                let numCalle = s.number || '0';
-                if (['SN', 'S/N'].includes(String(numCalle).toUpperCase())) numCalle = '0';
-                
-                const ubi = buscarUbicacion(s.zipcode, s.city || s.locality, s.province);
-                const obs = limpiarTexto(s.locality || '');
+                // Cargar el workbook con ExcelJS
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(plantillaBuffer);
 
-                datos.push([
-                    '',
-                    config.weight,
-                    config.alto,
-                    config.ancho,
-                    config.prof,
-                    Math.round(parseFloat(o.total || 0)),
-                    o.number,
-                    limpiarTexto(nombre),
-                    limpiarTexto(apellido),
-                    dni,
-                    c.email || '',
-                    codigo,
-                    numero,
-                    limpiarTexto(s.address || ''),
-                    numCalle,
-                    s.floor || '',
-                    s.apartment || '',
-                    ubi,
-                    obs
-                ]);
-            });
+                // Obtener la hoja "A domicilio"
+                const ws = workbook.getWorksheet('A domicilio');
 
-            // Crear workbook
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(datos);
-            
-            // Ajustar anchos
-            ws['!cols'] = [
-                {wch:15}, {wch:10}, {wch:10}, {wch:10}, {wch:12},
-                {wch:20}, {wch:12}, {wch:15}, {wch:15}, {wch:12},
-                {wch:25}, {wch:15}, {wch:15}, {wch:25}, {wch:10},
-                {wch:8}, {wch:12}, {wch:40}, {wch:30}
-            ];
-            
-            XLSX.utils.book_append_sheet(wb, ws, 'A domicilio');
-            
-            // Descargar
-            XLSX.writeFile(wb, `Andreani_${sels.length}_ordenes.xlsx`);
+                // Agregar datos empezando en la fila 3
+                sels.forEach((o, index) => {
+                    const row = index + 3;
+                    const s = o.shipping_address || {};
+                    const c = o.customer || {};
+                    
+                    // Procesar nombre y apellido
+                    const partes = (c.name || '').trim().split(/\s+/);
+                    const apellido = partes.length > 1 ? partes.pop() : '';
+                    const nombre = partes.join(' ');
+                    
+                    // Procesar teléfono
+                    let tel = String(s.phone || c.phone || '').replace(/\D/g, '');
+                    if (tel.startsWith('54')) tel = tel.substring(2);
+                    if (tel.startsWith('9')) tel = tel.substring(1);
+                    const codigo = tel.startsWith('11') ? '11' : tel.substring(0, 3);
+                    const numero = tel.startsWith('11') ? tel.substring(2) : tel.substring(3);
+                    
+                    // DNI (máx 8 dígitos)
+                    const dni = String(c.identification || '').replace(/\D/g, '').substring(0, 8);
+                    
+                    // Número de calle
+                    let numCalle = s.number || '0';
+                    if (['SN', 'S/N'].includes(String(numCalle).toUpperCase())) numCalle = '0';
+                    
+                    // Ubicación
+                    const ubi = buscarUbicacion(s.zipcode, s.city || s.locality, s.province);
+                    
+                    // Observaciones (limpias)
+                    const obs = limpiarTexto(s.locality || '');
 
-            document.getElementById('ordersPanel').classList.add('hidden');
-            document.getElementById('selectionBar').classList.remove('visible');
-            document.getElementById('successPanel').classList.remove('hidden');
-            toast('✅ Excel descargado', 'success');
+                    // Escribir en las celdas
+                    ws.getCell(row, 1).value = '';  // Paquete Guardado
+                    ws.getCell(row, 2).value = config.weight;  // Peso
+                    ws.getCell(row, 3).value = config.alto;  // Alto
+                    ws.getCell(row, 4).value = config.ancho;  // Ancho
+                    ws.getCell(row, 5).value = config.prof;  // Profundidad
+                    ws.getCell(row, 6).value = Math.round(parseFloat(o.total || 0));  // Valor declarado
+                    ws.getCell(row, 7).value = o.number;  // Numero interno
+                    ws.getCell(row, 8).value = limpiarTexto(nombre);  // Nombre
+                    ws.getCell(row, 9).value = limpiarTexto(apellido);  // Apellido
+                    ws.getCell(row, 10).value = dni;  // DNI
+                    ws.getCell(row, 11).value = c.email || '';  // Email
+                    ws.getCell(row, 12).value = codigo;  // Celular código
+                    ws.getCell(row, 13).value = numero;  // Celular número
+                    ws.getCell(row, 14).value = limpiarTexto(s.address || '');  // Calle
+                    ws.getCell(row, 15).value = numCalle;  // Número
+                    ws.getCell(row, 16).value = s.floor || '';  // Piso
+                    ws.getCell(row, 17).value = s.apartment || '';  // Departamento
+                    ws.getCell(row, 18).value = ubi;  // Provincia/Localidad/CP
+                    ws.getCell(row, 19).value = obs;  // Observaciones
+                });
+
+                // Generar el archivo
+                const buffer = await workbook.xlsx.writeBuffer();
+                
+                // Descargar
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Andreani_${sels.length}_ordenes.xlsx`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                document.getElementById('ordersPanel').classList.add('hidden');
+                document.getElementById('selectionBar').classList.remove('visible');
+                document.getElementById('successPanel').classList.remove('hidden');
+                toast('✅ Excel descargado', 'success');
+
+            } catch(err) {
+                console.error(err);
+                toast('❌ Error: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '📄 Generar Excel Andreani';
+            }
         }
 
         function toast(msg, type) {
