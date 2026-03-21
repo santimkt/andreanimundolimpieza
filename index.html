@@ -157,7 +157,6 @@
             </div>
         </div>
 
-        <!-- Panel Configuración -->
         <div id="configPanel" class="card">
             <h3 style="margin-bottom: 15px;">🔐 Conectar Tienda Nube</h3>
             <div class="form-row">
@@ -193,7 +192,6 @@
             </button>
         </div>
 
-        <!-- Panel Órdenes -->
         <div id="ordersPanel" class="card hidden">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
                 <h3>📋 Órdenes</h3>
@@ -202,11 +200,6 @@
                     <button class="filter-btn" onclick="filtrar('paid')">Pagadas <span id="countPaid">0</span></button>
                     <button class="filter-btn" onclick="filtrar('pending')">Pendientes <span id="countPending">0</span></button>
                 </div>
-            </div>
-            
-            <div class="loading hidden" id="loading">
-                <div class="spinner"></div>
-                <span id="loadingText">Cargando órdenes...</span>
             </div>
             
             <div class="table-container" id="tableContainer">
@@ -226,27 +219,25 @@
             </div>
         </div>
 
-        <!-- Panel Éxito -->
         <div id="successPanel" class="card hidden" style="text-align: center;">
             <div style="font-size: 60px; margin-bottom: 15px;">✅</div>
             <h2>¡Excel generado!</h2>
             <p style="color: #888; margin: 10px 0 20px;">Listo para subir a pymes.andreani.com</p>
-            <button class="btn btn-success" onclick="location.reload()" style="margin-bottom: 10px;">
+            <button class="btn btn-success" onclick="location.reload()">
                 🔄 Generar otro
             </button>
         </div>
     </div>
 
-    <!-- Barra de selección -->
     <div class="selection-bar" id="selectionBar">
         <span><strong id="selectedCount">0</strong> seleccionadas</span>
         <button class="btn btn-secondary" onclick="deseleccionar()">Limpiar</button>
         <button class="btn btn-primary" onclick="generarExcel()" style="width: auto;" id="btnGenerar">📄 Generar Excel Andreani</button>
     </div>
 
-    <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         let ordenes = [];
         let filtradas = [];
@@ -254,7 +245,6 @@
         let ubicaciones = [];
         let config = {};
 
-        // Cargar config guardada
         const saved = localStorage.getItem('tn_config');
         if (saved) {
             const s = JSON.parse(saved);
@@ -266,10 +256,9 @@
             document.getElementById('defaultProfundidad').value = s.prof || 10;
         }
 
-        // Cargar ubicaciones
         fetch('ubicaciones.json').then(r => r.json()).then(data => ubicaciones = data).catch(() => {});
 
-        function conectarTienda() {
+        async function conectarTienda() {
             config = {
                 storeId: document.getElementById('storeId').value,
                 accessToken: document.getElementById('accessToken').value,
@@ -285,12 +274,17 @@
             btn.disabled = true;
             btn.innerHTML = '⏳ Conectando...';
 
-            fetch(`/api/orders?storeId=${config.storeId}&accessToken=${config.accessToken}`)
-            .then(r => {
-                if (!r.ok) throw new Error('Error de conexión');
-                return r.json();
-            })
-            .then(data => {
+            try {
+                const response = await fetch(`/api/orders?storeId=${config.storeId}&accessToken=${config.accessToken}`);
+                const text = await response.text();
+                
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch(e) {
+                    throw new Error('Respuesta inválida del servidor');
+                }
+
                 if (data.error) throw new Error(data.error);
                 
                 ordenes = data;
@@ -304,12 +298,11 @@
                 renderTabla();
                 actualizarContadores();
                 toast('✅ ' + ordenes.length + ' órdenes cargadas', 'success');
-            })
-            .catch(err => {
+            } catch(err) {
                 toast('❌ ' + err.message, 'error');
                 btn.disabled = false;
                 btn.innerHTML = '🔌 Conectar y cargar órdenes';
-            });
+            }
         }
 
         function renderTabla() {
@@ -387,7 +380,7 @@
             return String(texto).replace(/-/g, ' ').replace(/"/g, '').replace(/;/g, ',').trim();
         }
 
-        async function generarExcel() {
+        function generarExcel() {
             const sels = ordenes.filter(o => seleccionadas.has(o.id));
             if (!sels.length) return toast('❌ Seleccioná al menos una orden', 'error');
 
@@ -395,8 +388,22 @@
             btn.disabled = true;
             btn.innerHTML = '⏳ Generando...';
 
-            // Preparar datos
-            const ordenesData = sels.map(o => {
+            // Crear datos para Excel con formato Andreani
+            const datos = [];
+            
+            // Fila 1 vacía (donde iría el logo)
+            datos.push([]);
+            
+            // Fila 2: Headers
+            datos.push([
+                'Paquete Guardado', 'Peso (grs)', 'Alto (cm)', 'Ancho (cm)', 'Profundidad (cm)',
+                'Valor declarado ($ C/IVA) *', 'Numero Interno', 'Nombre *', 'Apellido *', 'DNI *',
+                'Email *', 'Celular código *', 'Celular número *', 'Calle *', 'Número *',
+                'Piso', 'Departamento', 'Provincia / Localidad / CP *', 'Observaciones'
+            ]);
+
+            // Filas de datos
+            sels.forEach(o => {
                 const s = o.shipping_address || {};
                 const c = o.customer || {};
                 
@@ -418,59 +425,50 @@
                 const ubi = buscarUbicacion(s.zipcode, s.city || s.locality, s.province);
                 const obs = limpiarTexto(s.locality || '');
 
-                return {
-                    peso: config.weight,
-                    alto: config.alto,
-                    ancho: config.ancho,
-                    prof: config.prof,
-                    valor: Math.round(parseFloat(o.total || 0)),
-                    numeroInterno: o.number,
-                    nombre: limpiarTexto(nombre),
-                    apellido: limpiarTexto(apellido),
+                datos.push([
+                    '',
+                    config.weight,
+                    config.alto,
+                    config.ancho,
+                    config.prof,
+                    Math.round(parseFloat(o.total || 0)),
+                    o.number,
+                    limpiarTexto(nombre),
+                    limpiarTexto(apellido),
                     dni,
-                    email: c.email || '',
-                    celCodigo: codigo,
-                    celNumero: numero,
-                    calle: limpiarTexto(s.address || ''),
-                    numero: numCalle,
-                    piso: s.floor || '',
-                    depto: s.apartment || '',
-                    ubicacion: ubi,
-                    observaciones: obs
-                };
+                    c.email || '',
+                    codigo,
+                    numero,
+                    limpiarTexto(s.address || ''),
+                    numCalle,
+                    s.floor || '',
+                    s.apartment || '',
+                    ubi,
+                    obs
+                ]);
             });
 
-            try {
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ordenes: ordenesData, config })
-                });
+            // Crear workbook
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(datos);
+            
+            // Ajustar anchos
+            ws['!cols'] = [
+                {wch:15}, {wch:10}, {wch:10}, {wch:10}, {wch:12},
+                {wch:20}, {wch:12}, {wch:15}, {wch:15}, {wch:12},
+                {wch:25}, {wch:15}, {wch:15}, {wch:25}, {wch:10},
+                {wch:8}, {wch:12}, {wch:40}, {wch:30}
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, ws, 'A domicilio');
+            
+            // Descargar
+            XLSX.writeFile(wb, `Andreani_${sels.length}_ordenes.xlsx`);
 
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || 'Error generando Excel');
-                }
-
-                // Descargar el archivo
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Andreani_${sels.length}_ordenes.xlsx`;
-                a.click();
-                URL.revokeObjectURL(url);
-
-                document.getElementById('ordersPanel').classList.add('hidden');
-                document.getElementById('selectionBar').classList.remove('visible');
-                document.getElementById('successPanel').classList.remove('hidden');
-                toast('✅ Excel descargado', 'success');
-
-            } catch (err) {
-                toast('❌ ' + err.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '📄 Generar Excel Andreani';
-            }
+            document.getElementById('ordersPanel').classList.add('hidden');
+            document.getElementById('selectionBar').classList.remove('visible');
+            document.getElementById('successPanel').classList.remove('hidden');
+            toast('✅ Excel descargado', 'success');
         }
 
         function toast(msg, type) {
