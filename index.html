@@ -138,24 +138,6 @@
         .toast.success { border-color: #10b981; }
         .toast.error { border-color: #ef4444; }
         
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .tab {
-            padding: 12px 24px;
-            background: #16213e;
-            border: 1px solid #333;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        .tab.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: #667eea;
-        }
-        
         .upload-area {
             border: 2px dashed #333;
             border-radius: 12px;
@@ -203,6 +185,16 @@
         .step-content { flex: 1; }
         .step-title { font-weight: 600; margin-bottom: 4px; }
         .step-desc { font-size: 12px; color: #888; }
+        
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .warning-box h4 { color: #f59e0b; margin-bottom: 8px; }
+        .warning-box p { font-size: 13px; color: #ccc; }
     </style>
 </head>
 <body>
@@ -283,11 +275,16 @@
         <div id="generatePanel" class="card hidden">
             <h3 style="margin-bottom: 15px;">📄 Generar Excel para Andreani</h3>
             
+            <div class="warning-box">
+                <h4>⚠️ Importante</h4>
+                <p>Descargá la plantilla oficial desde pymes.andreani.com → Carga masiva → "Descargar plantilla". Luego subila acá.</p>
+            </div>
+            
             <div class="step">
                 <div class="step-number">1</div>
                 <div class="step-content">
-                    <div class="step-title">Subí la plantilla de Andreani</div>
-                    <div class="step-desc">Descargala de pymes.andreani.com → Carga masiva → Descargar plantilla</div>
+                    <div class="step-title">Subí la plantilla de Andreani (.xlsx)</div>
+                    <div class="step-desc">Solo archivos .xlsx descargados de pymes.andreani.com</div>
                 </div>
             </div>
             
@@ -301,6 +298,12 @@
             <button class="btn btn-primary" id="btnGenerate" onclick="generarExcel()" disabled>
                 ⚙️ Generar Excel Andreani
             </button>
+            
+            <div style="margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="volverAOrdenes()" style="width: 100%;">
+                    ← Volver a seleccionar órdenes
+                </button>
+            </div>
         </div>
 
         <!-- Éxito -->
@@ -318,19 +321,22 @@
     <div class="selection-bar" id="selectionBar">
         <span><strong id="selectedCount">0</strong> seleccionadas</span>
         <button class="btn btn-secondary" onclick="deseleccionar()">Limpiar</button>
-        <button class="btn btn-orange" onclick="descargarCSV()">📥 Descargar CSV</button>
+        <button class="btn btn-orange" onclick="descargarCSV()">📥 CSV</button>
         <button class="btn btn-primary" onclick="irAGenerar()" style="width: auto;">📄 Generar Excel</button>
     </div>
 
     <div class="toast" id="toast"></div>
 
+    <!-- ExcelJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    
     <script>
         let ordenes = [];
         let filtradas = [];
         let seleccionadas = new Set();
         let ubicaciones = [];
         let config = {};
-        let plantillaBase64 = null;
+        let plantillaBuffer = null;
         let ordenesParaExcel = [];
 
         // Cargar config guardada
@@ -475,26 +481,21 @@
             const s = o.shipping_address || {};
             const c = o.customer || {};
             
-            // Nombre y apellido
             const partes = (c.name || '').trim().split(/\s+/);
             const apellido = partes.length > 1 ? partes.pop() : '';
             const nombre = partes.join(' ');
             
-            // Teléfono
             let tel = String(s.phone || c.phone || '').replace(/\D/g, '');
             if (tel.startsWith('54')) tel = tel.substring(2);
             if (tel.startsWith('9')) tel = tel.substring(1);
             const codigo = tel.startsWith('11') ? '11' : tel.substring(0, 3);
             const numero = tel.startsWith('11') ? tel.substring(2) : tel.substring(3);
             
-            // DNI
             const dni = String(c.identification || '').replace(/\D/g, '').substring(0, 8);
             
-            // Número de calle
             let numCalle = s.number || '0';
             if (['SN', 'S/N', 'sn', 's/n'].includes(String(numCalle).toUpperCase().trim())) numCalle = '0';
             
-            // Ubicación
             const ubi = buscarUbicacion(s.zipcode, s.city || s.locality, s.province);
             
             return {
@@ -559,50 +560,98 @@
             document.getElementById('selectionBar').classList.remove('visible');
             document.getElementById('generatePanel').classList.remove('hidden');
         }
+        
+        function volverAOrdenes() {
+            document.getElementById('generatePanel').classList.add('hidden');
+            document.getElementById('ordersPanel').classList.remove('hidden');
+            document.getElementById('selectionBar').classList.add('visible');
+        }
 
         function handlePlantilla(input) {
             const file = input.files[0];
             if (!file) return;
+            
+            if (!file.name.endsWith('.xlsx')) {
+                toast('❌ Solo archivos .xlsx', 'error');
+                return;
+            }
             
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('uploadArea').classList.add('has-file');
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                plantillaBase64 = e.target.result.split(',')[1];
+                plantillaBuffer = e.target.result;
                 document.getElementById('btnGenerate').disabled = false;
+                toast('✅ Plantilla cargada', 'success');
             };
-            reader.readAsDataURL(file);
+            reader.onerror = function() {
+                toast('❌ Error al leer el archivo', 'error');
+            };
+            reader.readAsArrayBuffer(file);
         }
 
         async function generarExcel() {
-            if (!plantillaBase64) return toast('❌ Subí la plantilla primero', 'error');
+            if (!plantillaBuffer) return toast('❌ Subí la plantilla primero', 'error');
             if (!ordenesParaExcel.length) return toast('❌ No hay órdenes', 'error');
 
             const btn = document.getElementById('btnGenerate');
             btn.disabled = true;
-            btn.innerHTML = '⏳ Generando...';
+            btn.innerHTML = '⏳ Procesando plantilla...';
 
             try {
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        plantilla: plantillaBase64,
-                        ordenes: ordenesParaExcel
-                    })
+                // Cargar la plantilla con ExcelJS
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(plantillaBuffer);
+                
+                btn.innerHTML = '⏳ Buscando hoja...';
+                
+                // Buscar la hoja "A domicilio"
+                let ws = workbook.getWorksheet('A domicilio');
+                if (!ws) {
+                    // Intentar con otros nombres
+                    ws = workbook.getWorksheet(1);
+                    if (!ws) throw new Error('No se encontró la hoja de datos');
+                }
+                
+                btn.innerHTML = '⏳ Agregando ' + ordenesParaExcel.length + ' órdenes...';
+                
+                // Agregar datos desde fila 3
+                ordenesParaExcel.forEach((o, index) => {
+                    const row = index + 3;
+                    
+                    ws.getCell(row, 1).value = '';  // Paquete Guardado
+                    ws.getCell(row, 2).value = o.peso;
+                    ws.getCell(row, 3).value = o.alto;
+                    ws.getCell(row, 4).value = o.ancho;
+                    ws.getCell(row, 5).value = o.prof;
+                    ws.getCell(row, 6).value = o.valor;
+                    ws.getCell(row, 7).value = o.numeroInterno;
+                    ws.getCell(row, 8).value = o.nombre;
+                    ws.getCell(row, 9).value = o.apellido;
+                    ws.getCell(row, 10).value = o.dni;
+                    ws.getCell(row, 11).value = o.email;
+                    ws.getCell(row, 12).value = o.celCodigo;
+                    ws.getCell(row, 13).value = o.celNumero;
+                    ws.getCell(row, 14).value = o.calle;
+                    ws.getCell(row, 15).value = String(o.numero);
+                    ws.getCell(row, 16).value = o.piso || '';
+                    ws.getCell(row, 17).value = o.depto || '';
+                    ws.getCell(row, 18).value = o.ubicacion;
+                    ws.getCell(row, 19).value = o.observaciones || '';
                 });
 
-                const data = await response.json();
+                btn.innerHTML = '⏳ Generando archivo...';
+
+                // Generar el archivo
+                const buffer = await workbook.xlsx.writeBuffer();
                 
-                if (data.error) throw new Error(data.error);
-                
-                // Descargar el Excel
-                const blob = b64toBlob(data.excel, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                // Descargar
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `Andreani_${data.count}_ordenes.xlsx`;
+                a.download = `Andreani_${ordenesParaExcel.length}_ordenes.xlsx`;
                 a.click();
                 URL.revokeObjectURL(url);
 
@@ -611,25 +660,11 @@
                 toast('✅ Excel generado', 'success');
 
             } catch(err) {
-                console.error(err);
+                console.error('Error:', err);
                 toast('❌ Error: ' + err.message, 'error');
                 btn.disabled = false;
                 btn.innerHTML = '⚙️ Generar Excel Andreani';
             }
-        }
-
-        function b64toBlob(b64Data, contentType) {
-            const byteCharacters = atob(b64Data);
-            const byteArrays = [];
-            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-                const slice = byteCharacters.slice(offset, offset + 512);
-                const byteNumbers = new Array(slice.length);
-                for (let i = 0; i < slice.length; i++) {
-                    byteNumbers[i] = slice.charCodeAt(i);
-                }
-                byteArrays.push(new Uint8Array(byteNumbers));
-            }
-            return new Blob(byteArrays, { type: contentType });
         }
 
         function toast(msg, type) {
