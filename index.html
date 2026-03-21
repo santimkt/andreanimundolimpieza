@@ -387,19 +387,35 @@
 
             const btn = document.getElementById('btnGenerar');
             btn.disabled = true;
-            btn.innerHTML = '⏳ Generando...';
+            btn.innerHTML = '⏳ Descargando plantilla...';
 
             try {
                 // Descargar la plantilla de Andreani desde el repositorio
                 const plantillaResponse = await fetch('EnvioMasivoExcelPaquetes (5).xlsx');
+                
+                if (!plantillaResponse.ok) {
+                    throw new Error('No se pudo descargar la plantilla: ' + plantillaResponse.status);
+                }
+                
                 const plantillaBuffer = await plantillaResponse.arrayBuffer();
+                console.log('Plantilla descargada, tamaño:', plantillaBuffer.byteLength);
+
+                btn.innerHTML = '⏳ Procesando Excel...';
 
                 // Cargar el workbook con ExcelJS
                 const workbook = new ExcelJS.Workbook();
                 await workbook.xlsx.load(plantillaBuffer);
+                
+                console.log('Hojas disponibles:', workbook.worksheets.map(s => s.name));
 
                 // Obtener la hoja "A domicilio"
                 const ws = workbook.getWorksheet('A domicilio');
+                
+                if (!ws) {
+                    throw new Error('No se encontró la hoja "A domicilio"');
+                }
+
+                btn.innerHTML = '⏳ Agregando datos...';
 
                 // Agregar datos empezando en la fila 3
                 sels.forEach((o, index) => {
@@ -454,6 +470,8 @@
                     ws.getCell(row, 19).value = obs;  // Observaciones
                 });
 
+                btn.innerHTML = '⏳ Generando archivo...';
+
                 // Generar el archivo
                 const buffer = await workbook.xlsx.writeBuffer();
                 
@@ -472,7 +490,7 @@
                 toast('✅ Excel descargado', 'success');
 
             } catch(err) {
-                console.error(err);
+                console.error('Error completo:', err);
                 toast('❌ Error: ' + err.message, 'error');
                 btn.disabled = false;
                 btn.innerHTML = '📄 Generar Excel Andreani';
