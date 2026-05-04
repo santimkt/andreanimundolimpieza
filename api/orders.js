@@ -7,7 +7,7 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
-    const { storeId, accessToken } = req.query;
+    const { storeId, accessToken, page = 1 } = req.query;
 
     if (!storeId || !accessToken) {
         return res.status(400).json({ error: 'Faltan storeId o accessToken' });
@@ -15,11 +15,11 @@ export default async function handler(req, res) {
 
     try {
         const response = await fetch(
-            `https://api.tiendanube.com/v1/${storeId}/orders?per_page=50`,
+            `https://api.tiendanube.com/v1/${storeId}/orders?per_page=50&page=${page}`,
             {
                 headers: {
                     'Authentication': `bearer ${accessToken}`,
-                    'User-Agent': 'Andreani Generator (santimktonline@gmail.com)',
+                    'User-Agent': 'MundoLimpieza CSV Generator (santimktonline@gmail.com)',
                     'Content-Type': 'application/json'
                 }
             }
