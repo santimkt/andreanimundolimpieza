@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mundo Limpieza → CSV Andreani</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 150px; }
+        label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #0f0f23;
+            color: #fff;
+            font-size: 14px;
+        }
+        input:focus { outline: none; border-color: #667eea; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            width: 100%;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-secondary { background: #333; color: #fff; }
+        .btn-orange { background: #f59e0b; color: #fff; }
+        .btn-blue { background: #3b82f6; color: #fff; }
+        
+        .table-container { overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #0f0f23; padding: 12px 8px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; position: sticky; top: 0; }
+        td { padding: 10px 8px; border-bottom: 1px solid #333; vertical-align: top; }
+        tr:hover td { background: #1e1e3f; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .badge-blue { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .badge-purple { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 24px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .tab:hover { border-color: #667eea; color: #fff; }
+        .tab.active { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            border-color: transparent;
+            color: #fff; 
+        }
+        .tab .count {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-size: 12px;
+        }
+        
+        .selection-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 12px 20px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            z-index: 100;
+            flex-wrap: wrap;
+        }
+        .selection-bar.visible { display: flex; }
+        
+        .hidden { display: none !important; }
+        
+        .status { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px; 
+            padding: 6px 12px;
+            background: #0f0f23;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #888; }
+        .status-dot.connected { background: #10b981; box-shadow: 0 0 10px #10b981; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px 20px;
+            display: none;
+            z-index: 1000;
+        }
+        .toast.visible { display: block; }
+        .toast.success { border-color: #10b981; }
+        .toast.error { border-color: #ef4444; }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+        }
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #0f0f23;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pagination button:hover:not(:disabled) {
+            background: #667eea;
+            border-color: #667eea;
+        }
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .pagination .page-num {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .pagination .page-num.active {
+            background: #667eea;
+            border-color: #667eea;
+        }
+        
+        .products-list {
+            font-size: 11px;
+            color: #a5b4fc;
+            margin-top: 5px;
+        }
+        .product-item {
+            background: #0f0f23;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 3px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .product-name { flex: 1; }
+        .product-qty { 
+            background: #667eea;
+            color: #fff;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .product-variant {
+            color: #888;
+            font-size: 10px;
+        }
+        
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .info-bar .count {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #a5b4fc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧹 Mundo Limpieza → CSV Andreani</h1>
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Sin conectar</span>
+            </div>
+        </div>
+
+        <!-- Conectar -->
+        <div id="configPanel" class="card">
+            <h3 style="margin-bottom: 15px;">🔐 Conectar Tienda Nube</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Store ID</label>
+                    <input type="text" id="storeId" value="7315108">
+                </div>
+                <div class="form-group" style="flex: 2;">
+                    <label>Access Token</label>
+                    <input type="text" id="accessToken" value="090ec642dd423a76112095a7bf589726caeb7b5f">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Peso (grs)</label>
+                    <input type="number" id="defaultWeight" value="500">
+                </div>
+                <div class="form-group">
+                    <label>Alto (cm)</label>
+                    <input type="number" id="defaultAlto" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Ancho (cm)</label>
+                    <input type="number" id="defaultAncho" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Prof. (cm)</label>
+                    <input type="number" id="defaultProfundidad" value="10">
+                </div>
+            </div>
+            <button class="btn btn-primary" id="btnConnect" onclick="conectarTienda()">
+                🔌 Conectar y cargar órdenes
+            </button>
+        </div>
+
+        <!-- Órdenes -->
+        <div id="ordersPanel" class="card hidden">
+            <div class="info-bar">
+                <h3>📋 Órdenes Recibidas</h3>
+                <div class="count">
+                    ✅ <span id="totalRecibidas">0</span> órdenes con estado "Recibido"
+                </div>
+            </div>
+            
+            <!-- Tabs para domicilio/sucursal -->
+            <div class="tabs">
+                <button class="tab active" onclick="cambiarTab('domicilio')" id="tabDomicilio">
+                    🏠 A Domicilio <span class="count" id="countDomicilio">0</span>
+                </button>
+                <button class="tab" onclick="cambiarTab('sucursal')" id="tabSucursal">
+                    📦 A Sucursal <span class="count" id="countSucursal">0</span>
+                </button>
+            </div>
+            
+            <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
+                            <th>Orden</th>
+                            <th>Cliente</th>
+                            <th>Dirección</th>
+                            <th>Productos</th>
+                            <th>Tipo Envío</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersBody"></tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="pagination">
+                <button onclick="cambiarPagina(-1)" id="btnPrev">← Anterior</button>
+                <div class="page-numbers" id="pageNumbers"></div>
+                <button onclick="cambiarPagina(1)" id="btnNext">Siguiente →</button>
+            </div>
+        </div>
+
+        <!-- Éxito -->
+        <div id="successPanel" class="card hidden" style="text-align: center;">
+            <div style="font-size: 60px; margin-bottom: 15px;">✅</div>
+            <h2>¡CSV descargado!</h2>
+            <p style="color: #888; margin: 10px 0 20px;">Ahora subilo a Claude para generar el Excel de Andreani</p>
+            <button class="btn btn-success" onclick="location.reload()">
+                🔄 Descargar otro
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de selección -->
+    <div class="selection-bar" id="selectionBar">
+        <span><strong id="selectedCount">0</strong> seleccionadas</span>
+        <button class="btn btn-secondary" onclick="deseleccionar()">Limpiar</button>
+        <button class="btn btn-primary" onclick="descargarCSV()" style="width: auto;">📥 Descargar CSV</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let todasOrdenes = [];
+        let ordenesRecibidas = [];
+        let ordenesDomicilio = [];
+        let ordenesSucursal = [];
+        let ordenesFiltradas = [];
+        let seleccionadas = new Set();
+        let ubicaciones = [];
+        let config = {};
+        let tabActual = 'domicilio';
+        
+        const ORDENES_POR_PAGINA = 50;
+        let paginaActual = 1;
+        let totalPaginas = 1;
+
+        fetch('ubicaciones.json').then(r => r.json()).then(data => ubicaciones = data).catch(() => {});
+
+        async function conectarTienda() {
+            config = {
+                storeId: document.getElementById('storeId').value,
+                accessToken: document.getElementById('accessToken').value,
+                weight: parseInt(document.getElementById('defaultWeight').value) || 500,
+                alto: parseInt(document.getElementById('defaultAlto').value) || 10,
+                ancho: parseInt(document.getElementById('defaultAncho').value) || 10,
+                prof: parseInt(document.getElementById('defaultProfundidad').value) || 10
+            };
+
+            const btn = document.getElementById('btnConnect');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Conectando...';
+
+            try {
+                let allOrders = [];
+                let page = 1;
+                let hasMore = true;
+                
+                while (hasMore) {
+                    btn.innerHTML = `⏳ Cargando página ${page}...`;
+                    
+                    const response = await fetch(`/api/orders?storeId=${config.storeId}&accessToken=${config.accessToken}&page=${page}`);
+                    const text = await response.text();
+                    
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch(e) {
+                        throw new Error('Respuesta inválida del servidor');
+                    }
+
+                    if (data.error) throw new Error(data.error);
+                    
+                    if (data.length > 0) {
+                        allOrders = allOrders.concat(data);
+                        page++;
+                        if (data.length < 50) hasMore = false;
+                    } else {
+                        hasMore = false;
+                    }
+                    
+                    if (page > 20) hasMore = false;
+                }
+                
+                todasOrdenes = allOrders;
+                ordenesRecibidas = todasOrdenes.filter(o => o.payment_status === 'paid');
+                
+                // Separar por tipo de envío
+                ordenesDomicilio = ordenesRecibidas.filter(o => {
+                    const shipping = o.shipping_option || '';
+                    const shippingLower = shipping.toLowerCase();
+                    return !shippingLower.includes('sucursal') && !shippingLower.includes('retiro');
+                });
+                
+                ordenesSucursal = ordenesRecibidas.filter(o => {
+                    const shipping = o.shipping_option || '';
+                    const shippingLower = shipping.toLowerCase();
+                    return shippingLower.includes('sucursal') || shippingLower.includes('retiro');
+                });
+                
+                // Iniciar con domicilio
+                ordenesFiltradas = ordenesDomicilio;
+                
+                totalPaginas = Math.ceil(ordenesFiltradas.length / ORDENES_POR_PAGINA);
+                if (totalPaginas === 0) totalPaginas = 1;
+                paginaActual = 1;
+                
+                document.getElementById('statusDot').classList.add('connected');
+                document.getElementById('statusText').textContent = 'Conectado';
+                document.getElementById('configPanel').classList.add('hidden');
+                document.getElementById('ordersPanel').classList.remove('hidden');
+                document.getElementById('totalRecibidas').textContent = ordenesRecibidas.length;
+                document.getElementById('countDomicilio').textContent = ordenesDomicilio.length;
+                document.getElementById('countSucursal').textContent = ordenesSucursal.length;
+                
+                renderTabla();
+                renderPaginacion();
+                toast('✅ ' + ordenesRecibidas.length + ' órdenes recibidas (' + ordenesDomicilio.length + ' domicilio, ' + ordenesSucursal.length + ' sucursal)', 'success');
+            } catch(err) {
+                toast('❌ ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '🔌 Conectar y cargar órdenes';
+            }
+        }
+
+        function cambiarTab(tab) {
+            tabActual = tab;
+            seleccionadas.clear();
+            paginaActual = 1;
+            
+            document.getElementById('tabDomicilio').classList.toggle('active', tab === 'domicilio');
+            document.getElementById('tabSucursal').classList.toggle('active', tab === 'sucursal');
+            
+            ordenesFiltradas = tab === 'domicilio' ? ordenesDomicilio : ordenesSucursal;
+            
+            totalPaginas = Math.ceil(ordenesFiltradas.length / ORDENES_POR_PAGINA);
+            if (totalPaginas === 0) totalPaginas = 1;
+            
+            renderTabla();
+            renderPaginacion();
+            actualizarSeleccion();
+        }
+
+        function getOrdenesPaginaActual() {
+            const inicio = (paginaActual - 1) * ORDENES_POR_PAGINA;
+            const fin = inicio + ORDENES_POR_PAGINA;
+            return ordenesFiltradas.slice(inicio, fin);
+        }
+
+        function renderTabla() {
+            const tbody = document.getElementById('ordersBody');
+            tbody.innerHTML = '';
+            
+            const ordenesPagina = getOrdenesPaginaActual();
+            
+            ordenesPagina.forEach(o => {
+                const s = o.shipping_address || {};
+                const productos = o.products || [];
+                
+                // Determinar tipo de envío
+                const shipping = o.shipping_option || '';
+                const esSucursal = shipping.toLowerCase().includes('sucursal') || shipping.toLowerCase().includes('retiro');
+                
+                // Renderizar productos
+                let productosHTML = '<div class="products-list">';
+                productos.forEach(p => {
+                    const variante = p.variant_values ? p.variant_values.join(', ') : '';
+                    productosHTML += `
+                        <div class="product-item">
+                            <div>
+                                <div class="product-name">${p.name || 'Sin nombre'}</div>
+                                ${variante ? `<div class="product-variant">${variante}</div>` : ''}
+                            </div>
+                            <span class="product-qty">x${p.quantity || 1}</span>
+                        </div>
+                    `;
+                });
+                productosHTML += '</div>';
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="checkbox" ${seleccionadas.has(o.id) ? 'checked' : ''} onchange="toggleOrden(${o.id})"></td>
+                    <td><strong>#${o.number}</strong></td>
+                    <td>${o.customer?.name || '-'}<br><small style="color:#888">${o.customer?.email || ''}</small></td>
+                    <td>${s.address || ''} ${s.number || ''}<br><small style="color:#888">${s.city || ''}, ${s.province || ''}</small></td>
+                    <td>${productosHTML}</td>
+                    <td><span class="badge ${esSucursal ? 'badge-purple' : 'badge-blue'}">${esSucursal ? '📦 Sucursal' : '🏠 Domicilio'}</span><br><small style="color:#888">${shipping || 'No especificado'}</small></td>
+                    <td>$${parseFloat(o.total || 0).toLocaleString('es-AR')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            const ordenesPaginaIds = ordenesPagina.map(o => o.id);
+            const todosSeleccionados = ordenesPaginaIds.length > 0 && ordenesPaginaIds.every(id => seleccionadas.has(id));
+            document.getElementById('selectAll').checked = todosSeleccionados;
+        }
+
+        function renderPaginacion() {
+            const container = document.getElementById('pageNumbers');
+            container.innerHTML = '';
+            
+            let inicio = Math.max(1, paginaActual - 2);
+            let fin = Math.min(totalPaginas, inicio + 4);
+            if (fin - inicio < 4) inicio = Math.max(1, fin - 4);
+            
+            for (let i = inicio; i <= fin; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'page-num' + (i === paginaActual ? ' active' : '');
+                btn.textContent = i;
+                btn.onclick = () => irAPagina(i);
+                container.appendChild(btn);
+            }
+            
+            document.getElementById('btnPrev').disabled = paginaActual === 1;
+            document.getElementById('btnNext').disabled = paginaActual === totalPaginas;
+        }
+
+        function cambiarPagina(delta) {
+            const nuevaPagina = paginaActual + delta;
+            if (nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
+                paginaActual = nuevaPagina;
+                renderTabla();
+                renderPaginacion();
+            }
+        }
+
+        function irAPagina(num) {
+            paginaActual = num;
+            renderTabla();
+            renderPaginacion();
+        }
+
+        function toggleOrden(id) {
+            if (seleccionadas.has(id)) seleccionadas.delete(id);
+            else seleccionadas.add(id);
+            actualizarSeleccion();
+            renderTabla();
+        }
+
+        function toggleAll() {
+            const checked = document.getElementById('selectAll').checked;
+            const ordenesPagina = getOrdenesPaginaActual();
+            ordenesPagina.forEach(o => {
+                if (checked) seleccionadas.add(o.id);
+                else seleccionadas.delete(o.id);
+            });
+            renderTabla();
+            actualizarSeleccion();
+        }
+
+        function deseleccionar() {
+            seleccionadas.clear();
+            document.getElementById('selectAll').checked = false;
+            renderTabla();
+            actualizarSeleccion();
+        }
+
+        function actualizarSeleccion() {
+            document.getElementById('selectedCount').textContent = seleccionadas.size;
+            document.getElementById('selectionBar').classList.toggle('visible', seleccionadas.size > 0);
+        }
+
+        function buscarUbicacion(cp, loc, prov) {
+            cp = String(cp).trim();
+            const matches = ubicaciones.filter(u => u.endsWith(' / ' + cp));
+            if (!matches.length) return `${(prov || '').toUpperCase()} / ${(loc || '').toUpperCase()} / ${cp}`;
+            for (const u of matches) if (loc && u.toUpperCase().includes(loc.toUpperCase())) return u;
+            for (const u of matches) if (prov && u.toUpperCase().includes(prov.toUpperCase())) return u;
+            return matches[0];
+        }
+
+        function limpiarTexto(texto) {
+            if (!texto) return '';
+            return String(texto).replace(/-/g, ' ').replace(/"/g, '').replace(/;/g, ',').trim();
+        }
+
+        function procesarOrden(o) {
+            const s = o.shipping_address || {};
+            const c = o.customer || {};
+            
+            const partes = (c.name || '').trim().split(/\s+/);
+            const apellido = partes.length > 1 ? partes.pop() : '';
+            const nombre = partes.join(' ');
+            
+            let tel = String(s.phone || c.phone || '').replace(/\D/g, '');
+            if (tel.startsWith('54')) tel = tel.substring(2);
+            if (tel.startsWith('9')) tel = tel.substring(1);
+            const codigo = tel.startsWith('11') ? '11' : tel.substring(0, 3);
+            const numero = tel.startsWith('11') ? tel.substring(2) : tel.substring(3);
+            
+            const dni = String(c.identification || '').replace(/\D/g, '').substring(0, 8);
+            
+            let numCalle = s.number || '0';
+            if (['SN', 'S/N', 'sn', 's/n'].includes(String(numCalle).toUpperCase().trim())) numCalle = '0';
+            
+            const ubi = buscarUbicacion(s.zipcode, s.city || s.locality, s.province);
+            
+            // Productos
+            const productos = (o.products || []).map(p => {
+                const variante = p.variant_values ? p.variant_values.join(' ') : '';
+                return `${p.quantity}x ${p.name}${variante ? ' (' + variante + ')' : ''}`;
+            }).join(' | ');
+            
+            return {
+                peso: config.weight,
+                alto: config.alto,
+                ancho: config.ancho,
+                prof: config.prof,
+                valor: Math.round(parseFloat(o.total || 0)),
+                numeroInterno: o.number,
+                nombre: limpiarTexto(nombre),
+                apellido: limpiarTexto(apellido),
+                dni: dni,
+                email: c.email || '',
+                celCodigo: codigo,
+                celNumero: numero,
+                calle: limpiarTexto(s.address || ''),
+                numero: numCalle,
+                piso: s.floor || '',
+                depto: s.apartment || '',
+                ubicacion: ubi,
+                observaciones: limpiarTexto(s.locality || ''),
+                productos: productos,
+                tipoEnvio: (o.shipping_option || '').toLowerCase().includes('sucursal') ? 'Sucursal' : 'Domicilio'
+            };
+        }
+
+        function descargarCSV() {
+            const sels = ordenesFiltradas.filter(o => seleccionadas.has(o.id));
+            if (!sels.length) return toast('❌ Seleccioná al menos una orden', 'error');
+
+            const headers = ['Peso','Alto','Ancho','Prof','Valor','NumInterno','Nombre','Apellido','DNI','Email','CelCodigo','CelNumero','Calle','Numero','Piso','Depto','Ubicacion','Observaciones','Productos','TipoEnvio'];
+            
+            let csv = headers.join(',') + '\n';
+            
+            sels.forEach(o => {
+                const p = procesarOrden(o);
+                const row = [
+                    p.peso, p.alto, p.ancho, p.prof, p.valor, p.numeroInterno,
+                    `"${p.nombre}"`, `"${p.apellido}"`, p.dni, p.email,
+                    p.celCodigo, p.celNumero, `"${p.calle}"`, p.numero,
+                    p.piso, p.depto, `"${p.ubicacion}"`, `"${p.observaciones}"`,
+                    `"${p.productos}"`, p.tipoEnvio
+                ];
+                csv += row.join(',') + '\n';
+            });
+
+            const tipoEnvio = tabActual === 'domicilio' ? 'domicilio' : 'sucursal';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ordenes_${tipoEnvio}_${sels.length}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            document.getElementById('ordersPanel').classList.add('hidden');
+            document.getElementById('selectionBar').classList.remove('visible');
+            document.getElementById('successPanel').classList.remove('hidden');
+            toast('✅ CSV descargado', 'success');
+        }
+
+        function toast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast visible ' + type;
+            setTimeout(() => t.classList.remove('visible'), 3000);
+        }
+    </script>
+</body>
+</html>
